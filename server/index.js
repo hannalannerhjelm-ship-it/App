@@ -52,9 +52,16 @@ const upload = multer({
 });
 
 // Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || ''
+const DEMO_MODE = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'ANGE_DIN_API_NYCKEL_HÄR';
+const anthropic = DEMO_MODE ? null : new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
 });
+
+if (DEMO_MODE) {
+  console.log('⚠️  Running in DEMO MODE - Using mock questions (no API key configured)');
+} else {
+  console.log('✓ Using Anthropic API for question generation');
+}
 
 // Extract text from different file types
 async function extractText(filePath, originalName) {
@@ -79,8 +86,75 @@ async function extractText(filePath, originalName) {
   throw new Error('Filtyp stöds ej');
 }
 
+// Generate mock questions for demo mode
+function generateMockQuestions(questionType, numQuestions = 5) {
+  const sbaQuestions = [
+    {
+      question: "Vad betyder ordet 'karate' på japanska?",
+      options: ["A) Kraftfull hand", "B) Tom hand", "C) Snabb hand", "D) Stark hand"],
+      correctAnswer: "B",
+      explanation: "Karate betyder 'tom hand' och avser att man kämpar utan vapen."
+    },
+    {
+      question: "Vem anses vara modern karates fader?",
+      options: ["A) Mas Oyama", "B) Gichin Funakoshi", "C) Kenwa Mabuni", "D) Hironori Ohtsuka"],
+      correctAnswer: "B",
+      explanation: "Gichin Funakoshi spred karate till Japan på 1920-talet och anses vara modern karates fader."
+    },
+    {
+      question: "Vilket bälte har en nybörjare i karate?",
+      options: ["A) Gult bälte", "B) Orange bälte", "C) Vitt bälte", "D) Brunt bälte"],
+      correctAnswer: "C",
+      explanation: "Vitt bälte (9:e kyu) är för nybörjare som just börjat träna karate."
+    },
+    {
+      question: "Vad heter en framspark på japanska?",
+      options: ["A) Yoko-geri", "B) Mawashi-geri", "C) Mae-geri", "D) Ushiro-geri"],
+      correctAnswer: "C",
+      explanation: "Mae-geri är den japanska termen för framspark, en av de grundläggande sparkarna i karate."
+    },
+    {
+      question: "Vad kallas träningssalen i karate?",
+      options: ["A) Dojo", "B) Tatami", "C) Sensei", "D) Kata"],
+      correctAnswer: "A",
+      explanation: "Dojo är den japanska termen för träningssal där karate utövas."
+    }
+  ];
+
+  const mcqQuestions = [
+    {
+      question: "Vilka av följande är grundläggande tekniker i karate? (Välj alla som stämmer)",
+      options: ["A) Tsuki (slag)", "B) Geri (sparkar)", "C) Uke (block)", "D) Judo (kast)"],
+      correctAnswers: ["A", "B", "C"],
+      explanation: "Tsuki (slag), Geri (sparkar) och Uke (block) är alla grundläggande tekniker i karate. Judo är en annan kampsport."
+    },
+    {
+      question: "Vilka färger på bälten finns i karate-graderingssystemet? (Välj alla som stämmer)",
+      options: ["A) Vitt", "B) Gult", "C) Grönt", "D) Silver"],
+      correctAnswers: ["A", "B", "C"],
+      explanation: "Vitt, gult och grönt är alla vanliga bältesfärger i karate. Silver används normalt inte."
+    },
+    {
+      question: "Vilka av dessa är typer av kumite (sparring)?",
+      options: ["A) Kihon kumite", "B) Jiyu kumite", "C) Ippon kumite", "D) Heian kumite"],
+      correctAnswers: ["A", "B", "C"],
+      explanation: "Kihon kumite (grundläggande), Jiyu kumite (fri) och Ippon kumite (en-stegs) är alla typer av sparring. Heian är kata, inte kumite."
+    }
+  ];
+
+  const questions = questionType === 'SBA' ? sbaQuestions : mcqQuestions;
+  const selectedQuestions = questions.slice(0, Math.min(numQuestions, questions.length));
+
+  return { questions: selectedQuestions };
+}
+
 // Generate questions using Claude
 async function generateQuestions(text, questionType, numQuestions = 5) {
+  // Use mock data in demo mode
+  if (DEMO_MODE) {
+    console.log('Using mock questions (demo mode)');
+    return generateMockQuestions(questionType, numQuestions);
+  }
   const sbaPrompt = `Analysera följande läromaterial om karate och generera ${numQuestions} Single Best Answer (SBA) frågor.
 
 SBA-format:
